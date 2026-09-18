@@ -19,7 +19,7 @@ OrderFlow is a super-fast financial trading system built for Capital Markets. It
 * **Frontend:** React, HTML5 Canvas
 
 ## 💻 Getting Started
-*(Note: Update these steps as your project grows!)*
+
 
 1. **Clone the repository:**
    `git clone [insert your repository link here]`
