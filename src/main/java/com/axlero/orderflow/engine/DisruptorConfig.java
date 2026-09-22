@@ -1,0 +1,28 @@
+package com.axlero.orderflow.engine;
+
+import com.lmax.disruptor.BusySpinWaitStrategy;
+import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.ProducerType;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+
+@Configuration
+public class DisruptorConfig {
+    @Bean
+    public Disruptor<OrderEvent> orderEventDisruptor() {
+        ThreadFactory threadFactory = Executors.defaultThreadFactory();
+        Disruptor<OrderEvent> disruptor = new Disruptor<>(
+                new OrderEventFactory(),
+                1024,
+                threadFactory,
+                ProducerType.MULTI,
+                new BusySpinWaitStrategy()
+        );
+        disruptor.handleEventsWith(new OrderEventHandler());
+        disruptor.start();
+        return disruptor;
+    }
+}
