@@ -20,7 +20,7 @@ public class OrderEvent {
         this.quantity = quantity;
     }
 
-    // 🛡️ SECURITY: Wipe data clean so it cannot be leaked from memory
+    //  SECURITY: Wipe data clean so it cannot be leaked from memory
     public void clear() {
         this.orderId = 0L;
         this.side = 0;

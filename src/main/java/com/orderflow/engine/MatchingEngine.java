@@ -8,7 +8,7 @@ import java.util.concurrent.Executors;
 
 public class MatchingEngine {
     public static void main(String[] args) {
-        // 🛡️ SECURITY: Hard limit on buffer size to prevent RAM overflow attacks
+        // SECURITY: Hard limit on buffer size to prevent RAM overflow attacks
         int bufferSize = 1024 * 1024;
 
         // Set up the Disruptor

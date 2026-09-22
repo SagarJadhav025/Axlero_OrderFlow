@@ -16,13 +16,13 @@ public class SecureOrderPublisher {
             };
 
     public boolean publishOrder(long orderId, byte side, double price, int quantity) {
-        // 🛡️ SECURITY 1: Block malicious or broken inputs instantly
+        // SECURITY 1: Block malicious or broken inputs instantly
         if (orderId <= 0 || price <= 0.0 || quantity <= 0 || (side != 1 && side != 2)) {
             System.err.println("SECURITY ALERT: Malicious or invalid order rejected.");
             return false;
         }
 
-        // 🛡️ SECURITY 2: Anti-DDoS. Try to publish, but drop it safely if overloaded
+        // SECURITY 2: Anti-DDoS. Try to publish, but drop it safely if overloaded
         boolean success = ringBuffer.tryPublishEvent(TRANSLATOR, orderId, side, price, quantity);
 
         if (!success) {

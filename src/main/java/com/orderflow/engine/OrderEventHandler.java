@@ -10,7 +10,7 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
             // Process the order here safely
             System.out.println("Processing Secure Order ID: " + event.getOrderId());
         } finally {
-            // 🛡️ SECURITY: Always wipe the data at the end of the pipeline
+            // SECURITY: Always wipe the data at the end of the pipeline
             event.clear();
         }
     }
