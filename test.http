@@ -1,0 +1,8 @@
+POST http://localhost:8080/api/orders
+Content-Type: application/json
+
+{
+  "orderId": "AXL-1001",
+  "price": 50500.50,
+  "quantity": 5
+}
