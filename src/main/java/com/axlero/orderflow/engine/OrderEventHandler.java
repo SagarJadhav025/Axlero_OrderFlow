@@ -1,9 +1,11 @@
 package com.axlero.orderflow.engine;
 
 import com.lmax.disruptor.EventHandler;
+import org.springframework.stereotype.Component; // Added import
 import java.util.PriorityQueue;
 import java.util.Comparator;
 
+@Component // Added annotation here!
 public class OrderEventHandler implements EventHandler<OrderEvent> {
 
     // BUY side: Highest price matches first
@@ -51,5 +53,12 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
                 break;
             }
         }
+    }
+    public java.util.List<OrderRecord> getTopBids() {
+        return new java.util.ArrayList<>(buyOrders);
+    }
+
+    public java.util.List<OrderRecord> getTopAsks() {
+        return new java.util.ArrayList<>(sellOrders);
     }
 }
