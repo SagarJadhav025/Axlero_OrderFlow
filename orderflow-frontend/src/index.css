@@ -1,0 +1,260 @@
+:root {
+  --bg: #0d1117;
+  --panel-bg: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --buy: #2ea043;
+  --buy-dim: #1a3320;
+  --sell: #f85149;
+  --sell-dim: #3a1a18;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.terminal-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.terminal-header h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+}
+
+.terminal-subtitle {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.terminal-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr 1fr;
+  gap: 16px;
+  padding: 20px;
+}
+
+@media (max-width: 900px) {
+  .terminal-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.placeholder-panel h2 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.placeholder-text {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.order-entry-title {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.order-entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.side-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.side-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.side-btn.buy.active {
+  background: var(--buy-dim);
+  border-color: var(--buy);
+  color: var(--buy);
+}
+
+.side-btn.sell.active {
+  background: var(--sell-dim);
+  border-color: var(--sell);
+  color: var(--sell);
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-group label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.field-group input,
+.field-group select {
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.field-group input:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.form-error {
+  color: var(--sell);
+  font-size: 12px;
+  margin: 0;
+}
+
+.submit-btn {
+  padding: 12px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.submit-btn.buy {
+  background: var(--buy);
+  color: #06170a;
+}
+
+.submit-btn.sell {
+  background: var(--sell);
+  color: #1a0605;
+}
+
+.last-order {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+
+.pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.pill.buy {
+  background: var(--buy-dim);
+  color: var(--buy);
+}
+
+.pill.sell {
+  background: var(--sell-dim);
+  color: var(--sell);
+}
+
+.recent-trades-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.recent-trades-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.status-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.status-badge.status-live {
+  color: var(--buy);
+  border-color: var(--buy);
+}
+
+.status-badge.status-simulated {
+  color: #d29922;
+  border-color: #d29922;
+}
+
+.status-badge.status-error {
+  color: var(--sell);
+  border-color: var(--sell);
+}
+
+.trades-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.trades-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.trades-table td {
+  padding: 6px;
+  border-bottom: 1px solid #1c2129;
+}
+
+.trade-time {
+  color: var(--text-dim);
+  font-size: 12px;
+}
