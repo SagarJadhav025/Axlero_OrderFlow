@@ -1,6 +1,10 @@
 import OrderEntryForm from './components/OrderEntryForm.jsx'
+import RecentTrades from './components/RecentTrades.jsx'
+import { useTradeFeed } from './hooks/useTradeFeed.js'
 
 function App() {
+  const { trades, status, sendOrder } = useTradeFeed()
+
   return (
     <div className="terminal-shell">
       <header className="terminal-header">
@@ -10,16 +14,11 @@ function App() {
 
       <main className="terminal-main">
         <section className="panel order-entry-panel">
-          <OrderEntryForm />
+          <OrderEntryForm onSubmitOrder={sendOrder} />
         </section>
 
-        {/* Week 2: live-updating recent trades list goes here */}
-        <section className="panel placeholder-panel">
-          <h2>Recent Trades</h2>
-          <p className="placeholder-text">
-            Live trade feed will connect here in Week 2 once the WebSocket
-            integration is wired up.
-          </p>
+        <section className="panel">
+          <RecentTrades trades={trades} status={status} />
         </section>
 
         {/* Week 3: Order Book (standard DOM rendering) goes here */}
