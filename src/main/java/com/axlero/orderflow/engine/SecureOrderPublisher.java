@@ -1,5 +1,6 @@
 package com.axlero.orderflow.engine;
 
+import com.axlero.orderflow.OrderSide;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import org.springframework.stereotype.Component;
@@ -12,7 +13,7 @@ public class SecureOrderPublisher {
         this.ringBuffer = disruptor.getRingBuffer();
     }
 
-    public void publishOrder(String orderId, String side, double price, int quantity) {
+    public void publishOrder(String orderId, OrderSide side, double price, int quantity) {
         long sequence = ringBuffer.next();
         try {
             OrderEvent event = ringBuffer.get(sequence);
