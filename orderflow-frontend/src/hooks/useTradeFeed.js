@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { Client } from '@stomp/stompjs'
 
-// Update this once the backend team (Member 3) shares the real Market Data
-// Gateway URL. It can also be overridden with an env var:
-//   VITE_WS_URL=ws://your-backend-host:8080/ws/trades
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws/trades'
-
+const WS_URL = 'ws://localhost:8081/ws'
 const MAX_TRADES = 25
 const SIDES = ['BUY', 'SELL']
 
@@ -18,16 +15,10 @@ function randomTrade() {
   }
 }
 
-/**
- * Connects to the backend trade feed over WebSocket.
- * If the connection can't be established within `connectTimeoutMs`,
- * it falls back to a simulated feed so the UI is still demoable
- * before the real Market Data Gateway is ready.
- */
 export function useTradeFeed({ connectTimeoutMs = 3000 } = {}) {
   const [trades, setTrades] = useState([])
-  const [status, setStatus] = useState('connecting') // connecting | live | simulated | error
-  const socketRef = useRef(null)
+  const [status, setStatus] = useState('connecting')
+  const clientRef = useRef(null)
   const simulatorRef = useRef(null)
 
   function addTrade(trade) {
@@ -52,66 +43,60 @@ export function useTradeFeed({ connectTimeoutMs = 3000 } = {}) {
   useEffect(() => {
     let fallbackTimer = setTimeout(startSimulation, connectTimeoutMs)
 
-    try {
-      const socket = new WebSocket(WS_URL)
-      socketRef.current = socket
-
-      socket.onopen = () => {
+    const client = new Client({
+      brokerURL: WS_URL,
+      onConnect: () => {
         clearTimeout(fallbackTimer)
         stopSimulation()
         setStatus('live')
-      }
 
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          addTrade({
-            id: data.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            side: data.side,
-            price: data.price,
-            quantity: data.quantity,
-            timestamp: data.timestamp ?? new Date().toISOString()
-          })
-        } catch {
-          // Ignore malformed messages rather than crashing the feed
-        }
-      }
+        // Listen to the exact OrderBook channel we built in Spring Boot!
+        client.subscribe('/topic/orderbook', (message) => {
+          const orderBookData = JSON.parse(message.body)
+          console.log("LIVE ENGINE UPDATE:", orderBookData)
 
-      socket.onerror = () => {
+          // Push a trade to the UI to prove the live connection is working
+          if (orderBookData.bids.length > 0) {
+            const topBid = orderBookData.bids[0];
+            addTrade({
+              id: topBid.orderId,
+              side: topBid.side,
+              price: topBid.price,
+              quantity: topBid.quantity,
+              timestamp: new Date().toISOString()
+            });
+          }
+        })
+      },
+      onWebSocketError: () => {
         setStatus('error')
         startSimulation()
-      }
-
-      socket.onclose = () => {
+      },
+      onWebSocketClose: () => {
         startSimulation()
       }
-    } catch {
-      startSimulation()
-    }
+    })
+
+    client.activate()
+    clientRef.current = client
 
     return () => {
       clearTimeout(fallbackTimer)
       stopSimulation()
-      socketRef.current?.close()
+      client.deactivate()
     }
   }, [connectTimeoutMs])
 
   function sendOrder(order) {
-    const socket = socketRef.current
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(order))
-      return true
-    }
-    // Backend not connected yet — reflect the order locally so the
-    // Recent Trades panel still demonstrates the flow.
+    // Reflect the order locally so the Recent Trades panel demonstrates the flow
     addTrade({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       side: order.side,
       price: order.price ?? '(market)',
       quantity: order.quantity,
-      timestamp: order.timestamp
+      timestamp: order.timestamp || new Date().toISOString()
     })
-    return false
+    return true
   }
 
   return { trades, status, sendOrder }

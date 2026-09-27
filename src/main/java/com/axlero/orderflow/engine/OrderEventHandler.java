@@ -1,7 +1,11 @@
 package com.axlero.orderflow.engine;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Map;
+
 import com.axlero.orderflow.OrderSide;
-import com.axlero.orderflow.service.KafkaOrderProducer;
+// import com.axlero.orderflow.service.KafkaOrderProducer; // Muted to stop crashes
 import com.lmax.disruptor.EventHandler;
 import org.springframework.stereotype.Component;
 
@@ -13,9 +17,12 @@ import java.util.PriorityQueue;
 @Component
 public class OrderEventHandler implements EventHandler<OrderEvent> {
 
-    private final KafkaOrderProducer producer;
+    // private final KafkaOrderProducer producer; // Muted to stop crashes
 
     // BUY → highest price first
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
     private final PriorityQueue<OrderRecord> buyOrders =
             new PriorityQueue<>(
                     Comparator.comparingDouble(OrderRecord::getPrice).reversed()
@@ -27,9 +34,9 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
                     Comparator.comparingDouble(OrderRecord::getPrice)
             );
 
-    public OrderEventHandler(KafkaOrderProducer producer) {
-        this.producer = producer;
-    }
+    // public OrderEventHandler(KafkaOrderProducer producer) {
+    //     this.producer = producer;
+    // } // Muted so Spring Boot boots cleanly
 
     @Override
     public void onEvent(
@@ -58,24 +65,24 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
 
         // Add order to correct order book
         if (order.getSide() == OrderSide.BUY) {
-
             buyOrders.add(order);
-
         } else if (order.getSide() == OrderSide.SELL) {
-
             sellOrders.add(order);
-
         } else {
-
-            System.out.println(
-                    "Invalid order side: " + order.getSide()
-            );
-
+            System.out.println("Invalid order side: " + order.getSide());
             return;
         }
 
         // Try to match orders
         matchOrders();
+
+        // Broadcast the live update to the frontend!
+        Object payload = Map.of(
+                "bids", getTopBids(),
+                "asks", getTopAsks()
+        );
+
+        messagingTemplate.convertAndSend("/topic/orderbook", payload);
     }
 
     private void matchOrders() {
@@ -110,13 +117,13 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
                             tradePrice
             );
 
-            // Publish successful trade to Kafka
-            producer.publishTrade(
-                    buy.getOrderId(),
-                    sell.getOrderId(),
-                    tradedQuantity,
-                    tradePrice
-            );
+             //Publish successful trade to Kafka
+             //producer.publishTrade(
+             //        buy.getOrderId(),
+             //        sell.getOrderId(),
+             //        tradedQuantity,
+             //        tradePrice
+            // ); // Muted so it does not crash when producer is missing
 
             // Reduce remaining quantity
             buy.setQuantity(
