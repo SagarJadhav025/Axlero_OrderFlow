@@ -1,4 +1,4 @@
-package com.axlero.orderflow;
+package com.axlero.orderflow.controller;
 
 import com.axlero.orderflow.engine.OrderEventHandler;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -11,9 +11,13 @@ import java.util.concurrent.ThreadFactory;
 
 @Configuration
 public class DisruptorConfig {
+
     @Bean
-    public Disruptor<OrderEvent> orderEventDisruptor() {
+    public Disruptor<OrderEvent> orderEventDisruptor(
+            OrderEventHandler orderEventHandler) {
+
         ThreadFactory threadFactory = Executors.defaultThreadFactory();
+
         Disruptor<OrderEvent> disruptor = new Disruptor<>(
                 new OrderEventFactory(),
                 1024,
@@ -21,8 +25,11 @@ public class DisruptorConfig {
                 ProducerType.MULTI,
                 new BusySpinWaitStrategy()
         );
-        disruptor.handleEventsWith(new OrderEventHandler());
+
+        disruptor.handleEventsWith(orderEventHandler);
+
         disruptor.start();
+
         return disruptor;
     }
 }

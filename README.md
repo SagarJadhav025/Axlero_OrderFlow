@@ -1,36 +1,59 @@
 # Axlero_OrderFlow
 
-# 🚀 OrderFlow: High-Throughput Matching Gateway
+// for the Team member 5
+# frontend-canvas — OrderFlow Order Book (Member 5)
 
-## 📖 About The Project
-OrderFlow is a super-fast financial trading system built for Capital Markets. It processes millions of buy and sell orders per second with microsecond latency! ⚡ Instead of using slow traditional locks, we use a lock-free architecture to match trades instantly.
+High-frequency Level 2 order book and Depth-of-Market visualizer, rendered with HTML5 Canvas. Built to compare Canvas rendering performance against the standard DOM implementation (`frontend-dom/`) under high-frequency updates.
 
-## ✨ Key Features
-* **Ultra-Fast Matching Engine:** Uses the LMAX Disruptor pattern for lock-free processing and bypassing standard Garbage Collection. 🏎️
-* **Low Latency:** Proven to process 100,000 orders per second with a latency of under 100 microseconds. ⏱️
-* **Live Market Data:** Calculates and streams "Level 2" Order Book depth every 100ms using WebSockets. 📡
-* **High-Performance UI:** Uses HTML5 Canvas in React to render fast-moving market data without freezing the browser. 📊
-* **Risk Management:** Includes a simulated pre-trade risk check before allowing orders into the engine. 🛡️
+## Running it
 
-## 🛠️ Tech Stack
-* **Backend Core:** Java, LMAX Disruptor
-* **API & Streaming:** Spring WebFlux (Server-Sent Events / WebSockets)
-* **Message Broker:** Aeron or Kafka
-* **Frontend:** React, HTML5 Canvas
+No build step, no dependencies. Just open the file in a browser:
 
-## 💻 Getting Started
+    open frontend-canvas/orderflow-proto.html
 
+Or double-click it in your file explorer.
 
-1. **Clone the repository:**
-   `git clone [insert your repository link here]`
-2. **Setup the Backend:**
-   * Open the Java project in your favorite IDE (like IntelliJ or Eclipse).
-   * Install Maven dependencies.
-   * Run the main Spring Boot application.
-3. **Setup the Frontend:**
-   * Navigate to the frontend folder.
-   * Run `npm install` to download packages.
-   * Run `npm start` to launch the React app.
+## What's inside
 
-## 🌿 Branching Rule
-Please do not push code directly to the `main` branch. Always create a new branch for your task and open a Pull Request (PR) for review! 👀
+- **Canvas order book** — Level 2 bid/ask depth rendered on `<canvas>`, redrawn via `requestAnimationFrame`.
+- **DOM order book (comparison panel)** — a deliberately naive `innerHTML` rewrite on every tick, used as the baseline we're benchmarking against.
+- **Depth of Market chart** — cumulative buy/sell pressure as a shaded area chart, mid-price at center.
+- **Mock feed** — `genBook()` / `tick()` simulate order book updates locally so this runs standalone before the backend is ready.
+- **Live FPS counters** — shown per panel, updated twice a second.
+
+## Using it
+
+1. Click **Start feed**.
+2. Drag the **rate** slider up (1–200 updates/sec).
+3. Watch the two FPS counters — Canvas should hold close to 60fps well past the point where the DOM panel starts dropping frames.
+
+## Swapping in the real backend
+
+The mock feed lives in two functions: `tick()` and `genBook()`. Once Member 3's WebSocket/SSE endpoint is live, replace the interval with:
+
+    const ws = new WebSocket("wss://<backend-url>/market-data");
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      book = { bids: data.bids, asks: data.asks };
+    };
+
+No renderer code needs to change — it only depends on `book.bids` / `book.asks` having `{ price, qty }` entries.
+
+## Benchmark results
+
+_To fill in: FPS for Canvas vs DOM at 10/s, 50/s, 100/s, 200/s._
+
+| Rate | Canvas FPS | DOM FPS |
+|------|-----------|---------|
+| 10/s | | |
+| 50/s | | |
+| 100/s | | |
+| 200/s | | |
+
+## Status
+
+- [x] Week 1 — WebSocket scaffolding (mock feed in place)
+- [x] Week 2 — Streaming check, no perceived lag
+- [x] Week 3 — Canvas vs DOM Order Book UI + benchmark
+- [x] Week 4 — Depth of Market visualizer
+- [ ] Live feed integration (pending Member 3's backend)
