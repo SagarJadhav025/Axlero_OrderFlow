@@ -1,5 +1,6 @@
-package com.axlero.orderflow;
+package com.axlero.orderflow.controller;
 
+import com.axlero.orderflow.helper.OrderRequest;
 import com.axlero.orderflow.engine.SecureOrderPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
