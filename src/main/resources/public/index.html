@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>OrderFlow</title></head>
+<body>
+  <h2>OrderFlow: Live Trade Stream</h2>
+  <p id="status">connecting...</p>
+  <p id="stats"></p>
+  <canvas id="tape" width="400" height="420" style="border:1px solid #ccc"></canvas>
+
+  <h2>Order Book </h2>
+  <canvas id="orderBookCanvas" width="600" height="240" style="border:1px solid #ccc"></canvas>
+
+  <h2>Depth of Market </h2>
+  <canvas id="domCanvas" width="600" height="200" style="border:1px solid #ccc"></canvas>
+
+  <script src="marketDataSocket.js"></script>
+  <script src="canvasTape.js"></script>
+  <script src="streamCheck.js"></script>
+  <script src="orderBookCanvas.js"></script>
+  <script src="depthOfMarket.js"></script>
+  <script>
+    createMarketSocket('ws://localhost:8081',
+      (msg) => {
+        if (msg.type === 'trade') recordTrade(msg);
+        if (msg.type === 'orderbook') {
+          updateOrderBook(msg);
+          updateDOM(msg);
+        }
+      },
+      (s) => document.getElementById('status').textContent = 'Status: ' + s
+    );
+  </script>
+</body>
+</html>
