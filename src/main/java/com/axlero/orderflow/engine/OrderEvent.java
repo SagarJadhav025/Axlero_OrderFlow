@@ -1,20 +1,32 @@
 package com.axlero.orderflow.engine;
 
+import com.axlero.orderflow.enums.OrderSide;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class OrderEvent {
     private String orderId;
-    private String side;
+    private OrderSide side;
     private double price;
     private int quantity;
 
-    public String getOrderId() { return orderId; }
-    public void setOrderId(String orderId) { this.orderId = orderId; }
 
-    public String getSide() { return side; }
-    public void setSide(String side) { this.side = side; }
+    public void set(
+            String orderId,
+            OrderSide side,
+            double price,
+            int quantity) {
 
-    public double getPrice() { return price; }
-    public void setPrice(double price) { this.price = price; }
+        this.orderId = orderId;
+        this.side = side;
+        this.price = price;
+        this.quantity = quantity;
+    }
 
-    public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) { this.quantity = quantity; }
+
+
 }
