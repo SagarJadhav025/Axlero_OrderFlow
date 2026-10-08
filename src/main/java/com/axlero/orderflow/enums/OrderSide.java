@@ -1,4 +1,4 @@
-package com.axlero.orderflow;
+package com.axlero.orderflow.enums;
 
 public enum OrderSide {
     BUY,
