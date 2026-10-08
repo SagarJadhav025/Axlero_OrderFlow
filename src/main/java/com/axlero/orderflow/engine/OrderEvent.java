@@ -1,6 +1,6 @@
 package com.axlero.orderflow.engine;
 
-import com.axlero.orderflow.OrderSide;
+import com.axlero.orderflow.enums.OrderSide;
 import java.util.Locale;
 
 public class OrderEvent {
@@ -33,6 +33,14 @@ public class OrderEvent {
         this.orderId = orderId;
         this.side = OrderSide.valueOf(side.trim().toUpperCase(Locale.ROOT));
         this.orderType = orderType;
+        this.price = price;
+        this.quantity = quantity;
+    }
+
+    public void set(String orderId, OrderSide side, double price, int quantity) {
+        this.orderId = orderId;
+        this.side = side;
+        this.orderType = "LIMIT";
         this.price = price;
         this.quantity = quantity;
     }

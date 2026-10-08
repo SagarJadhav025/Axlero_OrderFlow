@@ -1,6 +1,6 @@
 package com.axlero.orderflow.engine;
 
-import com.axlero.orderflow.OrderSide;
+import com.axlero.orderflow.enums.OrderSide;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
