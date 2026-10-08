@@ -1,5 +1,6 @@
 package com.axlero.orderflow.engine;
 
+import com.axlero.orderflow.OrderSide;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,7 +21,7 @@ class SimpleOrderRingBufferTest {
         OrderEvent retrieved = buffer.get(0);
         assertSame(written, retrieved);
         assertEquals("A-1", retrieved.getOrderId());
-        assertEquals("BUY", retrieved.getSide());
+        assertEquals(OrderSide.BUY, retrieved.getSide());
         assertEquals("LIMIT", retrieved.getOrderType());
         assertEquals(12.5, retrieved.getPrice());
         assertEquals(4, retrieved.getQuantity());

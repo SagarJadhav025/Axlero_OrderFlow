@@ -11,8 +11,14 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 public class OrderEventHandler implements EventHandler<OrderEvent> {
@@ -33,13 +39,14 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
             new PriorityQueue<>(
                     Comparator.comparingDouble(OrderRecord::getPrice)
             );
+    private final Deque<Map<String, Object>> recentTrades = new ArrayDeque<>();
 
     // public OrderEventHandler(KafkaOrderProducer producer) {
     //     this.producer = producer;
     // } // Muted so Spring Boot boots cleanly
 
     @Override
-    public void onEvent(
+    public synchronized void onEvent(
             OrderEvent event,
             long sequence,
             boolean endOfBatch) {
@@ -63,20 +70,20 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
                         order.getQuantity()
         );
 
-        // Add order to correct order book
-        if (order.getSide() == OrderSide.BUY) {
-            buyOrders.add(order);
-        } else if (order.getSide() == OrderSide.SELL) {
-            sellOrders.add(order);
+        if ("MARKET".equalsIgnoreCase(event.getOrderType())) {
+            matchMarketOrder(order);
         } else {
-            System.out.println("Invalid order side: " + order.getSide());
-            return;
+            if (order.getSide() == OrderSide.BUY) {
+                buyOrders.add(order);
+            } else if (order.getSide() == OrderSide.SELL) {
+                sellOrders.add(order);
+            } else {
+                System.out.println("Invalid order side: " + order.getSide());
+                return;
+            }
+            matchOrders(order.getSide());
         }
 
-        // Try to match orders
-        matchOrders();
-
-        // Broadcast the live update to the frontend!
         Object payload = Map.of(
                 "bids", getTopBids(),
                 "asks", getTopAsks()
@@ -85,7 +92,7 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
         messagingTemplate.convertAndSend("/topic/orderbook", payload);
     }
 
-    private void matchOrders() {
+    private void matchOrders(OrderSide aggressorSide) {
 
         while (!buyOrders.isEmpty() && !sellOrders.isEmpty()) {
 
@@ -106,16 +113,7 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
             // Trade price = SELL price
             double tradePrice = sell.getPrice();
 
-            System.out.println(
-                    "TRADE MATCHED: " +
-                            buy.getOrderId() +
-                            " ↔ " +
-                            sell.getOrderId() +
-                            " | Quantity: " +
-                            tradedQuantity +
-                            " | Price: $" +
-                            tradePrice
-            );
+            publishTrade(aggressorSide, tradePrice, tradedQuantity, buy, sell);
 
              //Publish successful trade to Kafka
              //producer.publishTrade(
@@ -146,11 +144,79 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
         }
     }
 
-    public List<OrderRecord> getTopBids() {
-        return new ArrayList<>(buyOrders);
+    private void matchMarketOrder(OrderRecord incoming) {
+        PriorityQueue<OrderRecord> restingOrders = incoming.getSide() == OrderSide.BUY
+                ? sellOrders
+                : buyOrders;
+
+        while (incoming.getQuantity() > 0 && !restingOrders.isEmpty()) {
+            OrderRecord resting = restingOrders.peek();
+            int tradedQuantity = Math.min(incoming.getQuantity(), resting.getQuantity());
+            double tradePrice = resting.getPrice();
+
+            OrderRecord buy = incoming.getSide() == OrderSide.BUY ? incoming : resting;
+            OrderRecord sell = incoming.getSide() == OrderSide.SELL ? incoming : resting;
+            publishTrade(incoming.getSide(), tradePrice, tradedQuantity, buy, sell);
+
+            incoming.setQuantity(incoming.getQuantity() - tradedQuantity);
+            resting.setQuantity(resting.getQuantity() - tradedQuantity);
+            if (resting.getQuantity() == 0) {
+                restingOrders.poll();
+            }
+        }
     }
 
-    public List<OrderRecord> getTopAsks() {
-        return new ArrayList<>(sellOrders);
+    private void publishTrade(
+            OrderSide aggressorSide,
+            double price,
+            int quantity,
+            OrderRecord buy,
+            OrderRecord sell
+    ) {
+        Map<String, Object> trade = Map.of(
+                "tradeId", UUID.randomUUID().toString(),
+                "side", aggressorSide.name(),
+                "price", price,
+                "quantity", quantity,
+                "buyOrderId", buy.getOrderId(),
+                "sellOrderId", sell.getOrderId(),
+                "timestamp", Instant.now().toString()
+        );
+        recentTrades.addFirst(trade);
+        while (recentTrades.size() > 25) {
+            recentTrades.removeLast();
+        }
+        Object tradePayload = trade;
+        messagingTemplate.convertAndSend("/topic/trades", tradePayload);
+    }
+
+    public synchronized List<Map<String, Object>> getRecentTrades() {
+        return new ArrayList<>(recentTrades);
+    }
+
+    public synchronized List<OrderRecord> getTopBids() {
+        List<OrderRecord> bids = buyOrders.stream()
+                .map(order -> new OrderRecord(
+                        order.getOrderId(),
+                        order.getSide(),
+                        order.getPrice(),
+                        order.getQuantity()
+                ))
+                .collect(Collectors.toCollection(ArrayList::new));
+        bids.sort(Comparator.comparingDouble(OrderRecord::getPrice).reversed());
+        return bids;
+    }
+
+    public synchronized List<OrderRecord> getTopAsks() {
+        List<OrderRecord> asks = sellOrders.stream()
+                .map(order -> new OrderRecord(
+                        order.getOrderId(),
+                        order.getSide(),
+                        order.getPrice(),
+                        order.getQuantity()
+                ))
+                .collect(Collectors.toCollection(ArrayList::new));
+        asks.sort(Comparator.comparingDouble(OrderRecord::getPrice));
+        return asks;
     }
 }
