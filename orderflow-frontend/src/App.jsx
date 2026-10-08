@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import OrderEntryForm from './components/OrderEntryForm.jsx'
 import RecentTrades from './components/RecentTrades.jsx'
 import { useTradeFeed } from './hooks/useTradeFeed.js'
@@ -32,56 +32,111 @@ function buildInitialCandles() {
 
 function App() {
   const { trades, status, sendOrder, orderBook, orderBookError, tradeError } = useTradeFeed()
-  const [chartValues, setChartValues] = useState(buildInitialCandles)
-  const [price, setPrice] = useState(245.84)
+  const [demoChartValues] = useState(buildInitialCandles)
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setChartValues((previous) => {
-        const nextValue = Number(Math.max(240, Math.min(250, (previous[previous.length - 1] || 245.84) + (Math.random() - 0.45) * 1.6)).toFixed(2))
-        const next = [...previous.slice(-27), nextValue]
-        setPrice(next[next.length - 1])
-        return next
+  const level2 = useMemo(() => {
+    const aggregate = (orders, descending) => {
+      const levels = new Map()
+      orders.forEach((order) => {
+        const price = Number(order.price)
+        const key = price.toFixed(2)
+        const current = levels.get(key) ?? { price, size: 0, orders: 0 }
+        current.size += Number(order.size ?? order.quantity ?? 0)
+        current.orders += 1
+        levels.set(key, current)
       })
-    }, 1600)
+      return Array.from(levels.values())
+        .sort((left, right) => descending ? right.price - left.price : left.price - right.price)
+        .slice(0, 5)
+    }
 
-    return () => clearInterval(timer)
-  }, [])
+    return {
+      bids: aggregate(orderBook.bids, true),
+      asks: aggregate(orderBook.asks, false)
+    }
+  }, [orderBook])
+
+  const chartCandles = useMemo(() => {
+    if (trades.length === 0) {
+      return demoChartValues.map((close, index, values) => {
+        const open = index === 0 ? close : values[index - 1]
+        return {
+          open,
+          high: Math.max(open, close) + 0.35,
+          low: Math.min(open, close) - 0.35,
+          close,
+          volume: 0
+        }
+      })
+    }
+
+    const buckets = new Map()
+    trades.slice().reverse().forEach((trade) => {
+      const time = new Date(trade.timestamp)
+      const bucketTime = new Date(time)
+      bucketTime.setSeconds(0, 0)
+      const key = bucketTime.toISOString()
+      const price = Number(trade.price)
+      const candle = buckets.get(key)
+
+      if (candle) {
+        candle.high = Math.max(candle.high, price)
+        candle.low = Math.min(candle.low, price)
+        candle.close = price
+        candle.volume += Number(trade.quantity)
+      } else {
+        buckets.set(key, {
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          volume: Number(trade.quantity),
+          timestamp: bucketTime
+        })
+      }
+    })
+
+    return Array.from(buckets.values()).slice(-28)
+  }, [demoChartValues, trades])
+
+  const chartValues = useMemo(() => chartCandles.map((candle) => candle.close), [chartCandles])
+  const hasLivePrices = trades.length > 0
+  const recentTradedQuantity = trades.reduce((total, trade) => total + Number(trade.quantity), 0)
 
   const chartPoints = useMemo(() => {
     const width = 720
     const height = 180
     const padding = 18
-    const min = Math.min(...chartValues) - 1
-    const max = Math.max(...chartValues) + 1
+    const min = Math.min(...chartCandles.map((candle) => candle.low)) - 1
+    const max = Math.max(...chartCandles.map((candle) => candle.high)) + 1
 
-    return chartValues.map((value, index) => {
-      const x = padding + (index * (width - padding * 2)) / (chartValues.length - 1)
+    return chartCandles.map((candle, index) => {
+      const value = candle.close
+      const x = chartCandles.length === 1
+        ? width / 2
+        : padding + (index * (width - padding * 2)) / (chartCandles.length - 1)
       const y = height - padding - ((value - min) / (max - min || 1)) * (height - padding * 2)
       return { x, y, value }
     })
-  }, [chartValues])
+  }, [chartCandles])
 
   const candles = useMemo(() => {
     const width = 720
     const height = 180
     const padding = 18
-    const min = Math.min(...chartValues) - 1
-    const max = Math.max(...chartValues) + 1
-    const volumeMax = 1200
+    const min = Math.min(...chartCandles.map((candle) => candle.low)) - 1
+    const max = Math.max(...chartCandles.map((candle) => candle.high)) + 1
+    const volumeMax = Math.max(...chartCandles.map((candle) => candle.volume), 1)
 
-    return chartValues.map((value, index) => {
-      const previous = index === 0 ? value : chartValues[index - 1]
-      const open = Number(previous.toFixed(2))
-      const high = Number(Math.max(open, value) + 0.35)
-      const low = Number(Math.min(open, value) - 0.35)
-      const close = Number(value.toFixed(2))
-      const x = padding + (index * (width - padding * 2)) / (chartValues.length - 1)
+    return chartCandles.map((candle, index) => {
+      const { open, high, low, close, volume } = candle
+      const x = chartCandles.length === 1
+        ? width / 2
+        : padding + (index * (width - padding * 2)) / (chartCandles.length - 1)
       const yOpen = height - padding - ((open - min) / (max - min || 1)) * (height - padding * 2)
       const yClose = height - padding - ((close - min) / (max - min || 1)) * (height - padding * 2)
       const yHigh = height - padding - ((high - min) / (max - min || 1)) * (height - padding * 2)
       const yLow = height - padding - ((low - min) / (max - min || 1)) * (height - padding * 2)
-      const volume = 650 + Math.abs(close - open) * 1200 + (index % 5) * 110
       const volumeHeight = (volume / volumeMax) * 28
       const yVolume = 170 - volumeHeight
       const isUp = close >= open
@@ -96,10 +151,10 @@ function App() {
         close,
         isUp,
         volume,
-        yVolume,
+        yVolume
       }
     })
-  }, [chartValues])
+  }, [chartCandles])
 
   const chartSegments = useMemo(() => {
     if (chartPoints.length < 2) return []
@@ -123,15 +178,18 @@ function App() {
   const areaPath = useMemo(() => {
     if (chartPoints.length === 0) return ''
 
+    if (chartPoints.length === 1) return ''
     return `${chartPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ')} L ${chartPoints[chartPoints.length - 1].x.toFixed(2)} 162 L ${chartPoints[0].x.toFixed(2)} 162 Z`
   }, [chartPoints])
 
   const minPoint = chartPoints.reduce((lowest, point) => (point.value < lowest.value ? point : lowest), chartPoints[0])
   const maxPoint = chartPoints.reduce((highest, point) => (point.value > highest.value ? point : highest), chartPoints[0])
-  const lastPrice = chartValues[chartValues.length - 1] ?? price
-  const changePercent = (((lastPrice - chartValues[0]) / chartValues[0]) * 100)
-  const bestBid = orderBook.bids[0]?.price
-  const bestAsk = orderBook.asks[0]?.price
+  const lastPrice = chartValues[chartValues.length - 1]
+  const changePercent = chartValues.length > 1 && chartValues[0] !== 0
+    ? ((lastPrice - chartValues[0]) / chartValues[0]) * 100
+    : null
+  const bestBid = level2.bids[0]?.price
+  const bestAsk = level2.asks[0]?.price
   const spread = bestBid != null && bestAsk != null ? (bestAsk - bestBid).toFixed(2) : '—'
   const firstTrade = trades[0]
 
@@ -147,7 +205,9 @@ function App() {
         </div>
 
         <div className="topbar-center">
-          <div className="market-chip market-open">Market Open</div>
+          <div className={`market-chip ${status === 'live' ? 'market-open' : ''}`}>
+            {status === 'live' ? 'Engine Live' : 'Engine Disconnected'}
+          </div>
           <div className="mini-stat">
             <span>Spread</span>
             <strong>{spread === '—' ? spread : `$${spread}`}</strong>
@@ -156,14 +216,14 @@ function App() {
 
         <div className="account-panel">
           <span>Account</span>
-          <strong>$248,430</strong>
+          <strong>$248,430 <small>Demo</small></strong>
         </div>
       </header>
 
       <main className="dashboard-body">
         <aside className="left-rail panel">
           <div className="section-header">
-            <h3>Watchlist</h3>
+            <h3>Watchlist <span className="demo-label">Demo</span></h3>
             <button type="button" className="ghost-btn">Add</button>
           </div>
 
@@ -189,15 +249,17 @@ function App() {
           <div className="panel hero-panel">
             <div className="hero-header">
               <div>
-                <p className="eyebrow">NASDAQ • AAPL</p>
-                <h2>Apple Inc.</h2>
+                <p className="eyebrow">OrderFlow • Matching Engine</p>
+                <h2>{hasLivePrices ? 'Executed Trade Prices' : 'Demo Market Preview'}</h2>
               </div>
 
               <div className="price-summary">
                 <span className="current-price">${lastPrice.toFixed(2)}</span>
-                <span className={`price-change ${changePercent >= 0 ? 'positive' : 'negative'}`}>
-                  {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
-                </span>
+                {changePercent != null && (
+                  <span className={`price-change ${changePercent >= 0 ? 'positive' : 'negative'}`}>
+                    {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}% window
+                  </span>
+                )}
               </div>
             </div>
 
@@ -207,22 +269,27 @@ function App() {
                 <strong>${lastPrice.toFixed(2)}</strong>
               </div>
               <div className="metric-card">
-                <span>Change</span>
-                <strong className={changePercent >= 0 ? 'positive' : 'negative'}>
-                  {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
+                <span>Change (window)</span>
+                <strong className={changePercent == null ? '' : changePercent >= 0 ? 'positive' : 'negative'}>
+                  {changePercent == null ? '—' : `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`}
                 </strong>
               </div>
               <div className="metric-card">
-                <span>Volume</span>
-                <strong>8.4M</strong>
+                <span>Recent qty ({trades.length} fills)</span>
+                <strong>{hasLivePrices ? recentTradedQuantity.toLocaleString() : '—'}</strong>
               </div>
               <div className="metric-card">
-                <span>VWAP</span>
-                <strong>${(lastPrice - 0.12).toFixed(2)}</strong>
+                <span>VWAP (recent)</span>
+                <strong>{hasLivePrices
+                  ? `$${(trades.reduce((total, trade) => total + Number(trade.price) * Number(trade.quantity), 0) / recentTradedQuantity).toFixed(2)}`
+                  : '—'}</strong>
               </div>
             </div>
 
-            <div className="chart-surface" aria-label="Market chart">
+            <div className="chart-surface" aria-label={hasLivePrices ? 'Executed trade price chart' : 'Demo market chart'}>
+              <span className={`chart-data-label ${hasLivePrices ? 'live-data-label' : ''}`}>
+                {hasLivePrices ? 'Backend execution data · 1 min candles' : 'Simulated preview · waiting for executions'}
+              </span>
               <svg viewBox="0 0 720 180" preserveAspectRatio="none" className="chart-svg">
                 <defs>
                   <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
@@ -230,18 +297,20 @@ function App() {
                     <stop offset="100%" stopColor="rgba(100, 210, 255, 0.02)" />
                   </linearGradient>
                 </defs>
-                <path d={areaPath} fill="url(#chartFill)" opacity="0.9" />
+                {areaPath && <path d={areaPath} fill="url(#chartFill)" opacity="0.9" />}
 
                 {candles.map((candle, index) => (
                   <g key={`${candle.open}-${candle.close}-${index}`}>
-                    <rect
-                      x={candle.x - 7}
-                      y={candle.yVolume}
-                      width="14"
-                      height={170 - candle.yVolume}
-                      rx="2"
-                      fill={candle.isUp ? 'rgba(34, 197, 94, 0.2)' : 'rgba(248, 113, 113, 0.2)'}
-                    />
+                    {hasLivePrices && candle.volume > 0 && (
+                      <rect
+                        x={candle.x - 7}
+                        y={candle.yVolume}
+                        width="14"
+                        height={170 - candle.yVolume}
+                        rx="2"
+                        fill={candle.isUp ? 'rgba(34, 197, 94, 0.2)' : 'rgba(248, 113, 113, 0.2)'}
+                      />
+                    )}
                     <line
                       x1={candle.x}
                       x2={candle.x}
@@ -274,8 +343,8 @@ function App() {
                   />
                 ))}
 
-                <circle cx={maxPoint.x} cy={maxPoint.y} r="5" fill="#22c55e" />
-                <circle cx={minPoint.x} cy={minPoint.y} r="5" fill="#f87171" />
+                {chartPoints.length > 1 && <circle cx={maxPoint.x} cy={maxPoint.y} r="5" fill="#22c55e" />}
+                {chartPoints.length > 1 && <circle cx={minPoint.x} cy={minPoint.y} r="5" fill="#f87171" />}
                 <circle cx={chartPoints[chartPoints.length - 1].x} cy={chartPoints[chartPoints.length - 1].y} r="6" fill="#64d2ff" />
               </svg>
             </div>
@@ -285,45 +354,49 @@ function App() {
             <section className="panel orderbook-panel">
               <div className="section-header">
                 <h3>Order Book</h3>
-                <span className="section-pill">Depth</span>
+                <span className="section-pill">Level 2 · aggregated</span>
               </div>
               {orderBookError && <p className="form-error">{orderBookError}</p>}
 
               <div className="book-grid">
                 <div className="book-column">
                   <div className="book-column-header">
-                    <span>Bids</span>
+                    <span>Orders</span>
                     <span>Qty</span>
                     <span>Price</span>
                   </div>
-                  {orderBook.bids.map((level) => (
-                    <div key={level.orderId} className="book-row buy-row">
+                  {level2.bids.map((level) => (
+                    <div key={level.price} className="book-row buy-row">
+                      <span>{level.orders}</span>
                       <span>{level.size}</span>
                       <span>{level.price.toFixed(2)}</span>
                     </div>
                   ))}
+                  {level2.bids.length === 0 && <p className="placeholder-text">No resting bids</p>}
                 </div>
 
                 <div className="book-column">
                   <div className="book-column-header">
-                    <span>Asks</span>
+                    <span>Orders</span>
                     <span>Qty</span>
                     <span>Price</span>
                   </div>
-                  {orderBook.asks.map((level) => (
-                    <div key={level.orderId} className="book-row sell-row">
+                  {level2.asks.map((level) => (
+                    <div key={level.price} className="book-row sell-row">
+                      <span>{level.orders}</span>
                       <span>{level.size}</span>
                       <span>{level.price.toFixed(2)}</span>
                     </div>
                   ))}
+                  {level2.asks.length === 0 && <p className="placeholder-text">No resting asks</p>}
                 </div>
               </div>
             </section>
 
             <section className="panel positions-panel">
               <div className="section-header">
-                <h3>Positions</h3>
-                <span className="section-pill positive">P&L +2.6%</span>
+                <h3>Positions <span className="demo-label">Demo</span></h3>
+                <span className="section-pill">Sample portfolio</span>
               </div>
 
               <div className="positions-list">
@@ -378,8 +451,8 @@ function App() {
                 <strong>{bestAsk == null ? '—' : `$${bestAsk.toFixed(2)}`}</strong>
               </div>
               <div>
-                <span>Volume</span>
-                <strong>8.4M</strong>
+                <span>Recent qty ({trades.length} fills)</span>
+                <strong>{hasLivePrices ? recentTradedQuantity.toLocaleString() : '—'}</strong>
               </div>
             </div>
           </div>
