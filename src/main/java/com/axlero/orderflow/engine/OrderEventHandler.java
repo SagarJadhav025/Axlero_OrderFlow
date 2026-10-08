@@ -46,11 +46,11 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
 
         // Copy Disruptor event into OrderRecord
         OrderRecord order = new OrderRecord(
-                event.getOrderId(),
-                event.getSide(),
-                event.getPrice(),
-                event.getQuantity()
-        );
+        event.getOrderId(),
+        OrderSide.valueOf(event.getSide()),
+        event.getPrice(),
+        event.getQuantity()
+);
 
         System.out.println(
                 "Received " +

@@ -18,7 +18,7 @@ public class SecureOrderPublisher {
         try {
             OrderEvent event = ringBuffer.get(sequence);
             event.setOrderId(orderId);
-            event.setSide(side);
+            event.setSide(side.name());
             event.setPrice(price);
             event.setQuantity(quantity);
         } finally {
