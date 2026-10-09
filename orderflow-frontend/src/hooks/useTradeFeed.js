@@ -1,103 +1,136 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Client } from '@stomp/stompjs'
 
-const WS_URL = 'ws://localhost:8081/ws'
+const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
 const MAX_TRADES = 25
-const SIDES = ['BUY', 'SELL']
+const EMPTY_ORDERBOOK = { bids: [], asks: [] }
 
-function randomTrade() {
+function normalizeOrderBook(payload = EMPTY_ORDERBOOK) {
+  const normalize = (entries = []) => (entries || []).slice(0, 5).map((entry) => ({
+    orderId: entry.orderId ?? `${entry.side ?? 'order'}-${entry.price}`,
+    side: entry.side ?? 'BUY',
+    price: Number(entry.price),
+    size: Number(entry.quantity ?? entry.size ?? 0),
+    quantity: Number(entry.quantity ?? entry.size ?? 0)
+  }))
+
   return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    side: SIDES[Math.floor(Math.random() * SIDES.length)],
-    price: (100 + Math.random() * 50).toFixed(2),
-    quantity: Math.floor(1 + Math.random() * 50),
-    timestamp: new Date().toISOString()
+    bids: normalize(payload.bids),
+    asks: normalize(payload.asks)
   }
 }
 
 export function useTradeFeed({ connectTimeoutMs = 3000 } = {}) {
   const [trades, setTrades] = useState([])
   const [status, setStatus] = useState('connecting')
-  const clientRef = useRef(null)
-  const simulatorRef = useRef(null)
+  const [orderBook, setOrderBook] = useState(EMPTY_ORDERBOOK)
+  const [orderBookError, setOrderBookError] = useState('')
+  const [tradeError, setTradeError] = useState('')
 
   function addTrade(trade) {
-    setTrades((prev) => [trade, ...prev].slice(0, MAX_TRADES))
+    setTrades((previous) => [trade, ...previous.filter((item) => item.id !== trade.id)].slice(0, MAX_TRADES))
   }
 
-  function startSimulation() {
-    if (simulatorRef.current) return
-    setStatus('simulated')
-    simulatorRef.current = setInterval(() => {
-      addTrade(randomTrade())
-    }, 1200)
-  }
-
-  function stopSimulation() {
-    if (simulatorRef.current) {
-      clearInterval(simulatorRef.current)
-      simulatorRef.current = null
-    }
+  function loadTrades(entries) {
+    setTrades((previous) => {
+      const merged = new Map(entries.map((trade) => [trade.id, trade]))
+      previous.forEach((trade) => {
+        if (!merged.has(trade.id)) merged.set(trade.id, trade)
+      })
+      return [...merged.values()].slice(0, MAX_TRADES)
+    })
   }
 
   useEffect(() => {
-    let fallbackTimer = setTimeout(startSimulation, connectTimeoutMs)
-
     const client = new Client({
       brokerURL: WS_URL,
+      reconnectDelay: connectTimeoutMs,
       onConnect: () => {
-        clearTimeout(fallbackTimer)
-        stopSimulation()
         setStatus('live')
 
-        // Listen to the exact OrderBook channel we built in Spring Boot!
         client.subscribe('/topic/orderbook', (message) => {
-          const orderBookData = JSON.parse(message.body)
-          console.log("LIVE ENGINE UPDATE:", orderBookData)
+          const orderBookData = normalizeOrderBook(JSON.parse(message.body))
+          setOrderBook(orderBookData)
+        })
 
-          // Push a trade to the UI to prove the live connection is working
-          if (orderBookData.bids.length > 0) {
-            const topBid = orderBookData.bids[0];
-            addTrade({
-              id: topBid.orderId,
-              side: topBid.side,
-              price: topBid.price,
-              quantity: topBid.quantity,
-              timestamp: new Date().toISOString()
-            });
+        client.subscribe('/topic/trades', (message) => {
+          const execution = JSON.parse(message.body)
+          if (!execution.tradeId || !execution.timestamp || !Number.isFinite(Number(execution.price))) {
+            return
           }
+          addTrade({
+            id: execution.tradeId,
+            side: execution.side,
+            price: Number(execution.price).toFixed(2),
+            quantity: execution.quantity,
+            timestamp: execution.timestamp
+          })
         })
       },
-      onWebSocketError: () => {
-        setStatus('error')
-        startSimulation()
-      },
-      onWebSocketClose: () => {
-        startSimulation()
-      }
+      onStompError: () => setStatus('disconnected'),
+      onWebSocketError: () => setStatus('disconnected'),
+      onWebSocketClose: () => setStatus('disconnected')
     })
 
     client.activate()
-    clientRef.current = client
 
     return () => {
-      clearTimeout(fallbackTimer)
-      stopSimulation()
       client.deactivate()
     }
   }, [connectTimeoutMs])
 
-  function sendOrder(order) {
-    // Reflect the order locally so the Recent Trades panel demonstrates the flow
-    addTrade({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      side: order.side,
-      price: order.price ?? '(market)',
-      quantity: order.quantity,
-      timestamp: order.timestamp || new Date().toISOString()
+  useEffect(() => {
+    fetch('/api/orderbook')
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Order book request failed (${response.status})`)
+        return response.json()
+      })
+      .then((payload) => {
+        setOrderBook(normalizeOrderBook(payload))
+        setOrderBookError('')
+      })
+      .catch((error) => {
+        setOrderBookError(error.message)
+      })
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/trades')
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Recent trades request failed (${response.status})`)
+        return response.json()
+      })
+      .then((entries) => {
+        loadTrades(entries.map((execution) => ({
+          id: execution.tradeId,
+          side: execution.side,
+          price: Number(execution.price).toFixed(2),
+          quantity: execution.quantity,
+          timestamp: execution.timestamp
+        })))
+        setTradeError('')
+      })
+      .catch((error) => setTradeError(error.message))
+  }, [])
+
+  async function sendOrder(order) {
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: `web-${crypto.randomUUID()}`,
+        side: order.side,
+        orderType: order.orderType,
+        price: order.price ?? 0,
+        quantity: order.quantity
+      })
     })
-    return true
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `Order submission failed (${response.status})`)
+    }
+    return response.text()
   }
 
-  return { trades, status, sendOrder }
+  return { trades, status, sendOrder, orderBook, orderBookError, tradeError }
 }
