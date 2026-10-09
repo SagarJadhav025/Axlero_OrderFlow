@@ -12,12 +12,6 @@ const watchlist = [
   { symbol: 'TSLA', price: 214.06, change: -1.12, volume: '9.7M' }
 ]
 
-const positions = [
-  { symbol: 'AAPL', side: 'Long', qty: 241, avg: 243.10, value: 58700 },
-  { symbol: 'MSFT', side: 'Long', qty: 61, avg: 418.90, value: 25134 },
-  { symbol: 'NVDA', side: 'Short', qty: 81, avg: 143.60, value: -11488 }
-]
-
 function buildInitialCandles() {
   const values = []
   let current = 245.2
@@ -194,6 +188,36 @@ function App() {
   const spread = bestBid != null && bestAsk != null ? (bestAsk - bestBid).toFixed(2) : '—'
   const firstTrade = trades[0]
 
+  // LIVE POSITIONS CALCULATOR
+  const livePositions = useMemo(() => {
+    if (trades.length === 0) return [];
+
+    let totalQty = 0;
+    let totalCost = 0;
+
+    // Calculate total accumulated quantity and average entry price
+    trades.forEach((trade) => {
+      const qty = Number(trade.quantity);
+      const price = Number(trade.price);
+      totalQty += qty;
+      totalCost += (qty * price);
+    });
+
+    const avgPrice = totalQty > 0 ? totalCost / totalQty : 0;
+    const currentPrice = Number(trades[0]?.price || avgPrice);
+    const currentValue = totalQty * currentPrice;
+
+    return [
+      {
+        symbol: 'ACTIVE',
+        side: 'Long',
+        qty: totalQty,
+        avg: avgPrice,
+        value: currentValue
+      }
+    ];
+  }, [trades]);
+
   return (
       <div className="dashboard-shell">
         <header className="topbar panel">
@@ -217,14 +241,14 @@ function App() {
 
           <div className="account-panel">
             <span>Account</span>
-            <strong>$248,430 <small>Demo</small></strong>
+            <strong>$248,430</strong>
           </div>
         </header>
 
         <main className="dashboard-body">
           <aside className="left-rail panel">
             <div className="section-header">
-              <h3>Watchlist <span className="demo-label">Demo</span></h3>
+              <h3>Watchlist</h3>
               <button type="button" className="ghost-btn">Add</button>
             </div>
 
@@ -364,30 +388,34 @@ function App() {
 
               <section className="panel positions-panel">
                 <div className="section-header">
-                  <h3>Positions <span className="demo-label">Demo</span></h3>
-                  <span className="section-pill">Sample portfolio</span>
+                  <h3>Live Positions</h3>
+                  <span className="section-pill">Real-time portfolio</span>
                 </div>
 
                 <div className="positions-list">
-                  {positions.map((item) => (
-                      <div key={item.symbol} className="position-row">
-                        <div>
-                          <strong>{item.symbol}</strong>
-                          <small>{item.side}</small>
-                        </div>
-                        <div>
-                          <strong>{item.qty}</strong>
-                          <small>Qty</small>
-                        </div>
-                        <div>
-                          <strong>{item.avg.toFixed(2)}</strong>
-                          <small>Avg</small>
-                        </div>
-                        <div className={item.side === 'Short' ? 'negative' : 'positive'}>
-                          <strong>${Math.abs(item.value).toLocaleString()}</strong>
-                        </div>
-                      </div>
-                  ))}
+                  {livePositions.length === 0 ? (
+                      <p style={{ color: '#888', padding: '10px' }}>No active positions yet. Execute a trade to begin.</p>
+                  ) : (
+                      livePositions.map((item) => (
+                          <div key={item.symbol} className="position-row">
+                            <div>
+                              <strong>{item.symbol}</strong>
+                              <small>{item.side}</small>
+                            </div>
+                            <div>
+                              <strong>{item.qty}</strong>
+                              <small>Qty</small>
+                            </div>
+                            <div>
+                              <strong>{item.avg.toFixed(2)}</strong>
+                              <small>Avg</small>
+                            </div>
+                            <div className="positive">
+                              <strong>${Math.abs(item.value).toLocaleString()}</strong>
+                            </div>
+                          </div>
+                      ))
+                  )}
                 </div>
               </section>
             </div>
