@@ -13,7 +13,7 @@ export default function OrderBook({ bids = [], asks = [] }) {
                         asks.map((ask, index) => (
                             <li key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #2a2a2a' }}>
                                 <span>Price: <strong style={{ color: '#ff7777' }}>{ask.price}</strong></span>
-                                <span>Qty: <strong>{ask.quantity}</strong></span>
+                                <span>Qty: <strong>{ask.size}</strong></span>
                             </li>
                         ))
                     )}
@@ -30,7 +30,7 @@ export default function OrderBook({ bids = [], asks = [] }) {
                         bids.map((bid, index) => (
                             <li key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #2a2a2a' }}>
                                 <span>Price: <strong style={{ color: '#77ff77' }}>{bid.price}</strong></span>
-                                <span>Qty: <strong>{bid.quantity}</strong></span>
+                                <span>Qty: <strong>{bid.size}</strong></span>
                             </li>
                         ))
                     )}
