@@ -18,26 +18,27 @@ Or double-click it in your file explorer.
 - **Canvas order book** — Level 2 bid/ask depth rendered on `<canvas>`, redrawn via `requestAnimationFrame`.
 - **DOM order book (comparison panel)** — a deliberately naive `innerHTML` rewrite on every tick, used as the baseline we're benchmarking against.
 - **Depth of Market chart** — cumulative buy/sell pressure as a shaded area chart, mid-price at center.
-- **Mock feed** — `genBook()` / `tick()` simulate order book updates locally so this runs standalone before the backend is ready.
+- **Live WebSocket Feed** — connected directly to the Spring Boot matching engine to stream executed trades and resting orders in real-time.
 - **Live FPS counters** — shown per panel, updated twice a second.
 
 ## Using it
 
-1. Click **Start feed**.
-2. Drag the **rate** slider up (1–200 updates/sec).
-3. Watch the two FPS counters — Canvas should hold close to 60fps well past the point where the DOM panel starts dropping frames.
+1. Start the Spring Boot backend engine locally (default port `8080`).
+2. Open `orderflow-proto.html` in your browser and click **Start feed**.
+3. Submit limit orders via the UI and watch the real-time order book populate.
+4. Watch the two FPS counters — Canvas should hold close to 60fps well past the point where the DOM panel starts dropping frames.
 
-## Swapping in the real backend
+## Live Backend Integration
 
-The mock feed lives in two functions: `tick()` and `genBook()`. Once Member 3's WebSocket/SSE endpoint is live, replace the interval with:
+The UI is now fully integrated with the live Spring Boot matching engine. The WebSocket connection streams real-time market data directly from the backend:
 
-    const ws = new WebSocket("wss://<backend-url>/market-data");
+    const ws = new WebSocket("ws://localhost:8080/market-data"); // Replace with production URL when deployed
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       book = { bids: data.bids, asks: data.asks };
     };
 
-No renderer code needs to change — it only depends on `book.bids` / `book.asks` having `{ price, qty }` entries.
+No renderer code needs to change — it dynamically updates based on `book.bids` and `book.asks` arrays containing `{ price, size }` entries.
 
 ## Benchmark results
 
@@ -56,4 +57,4 @@ _To fill in: FPS for Canvas vs DOM at 10/s, 50/s, 100/s, 200/s._
 - [x] Week 2 — Streaming check, no perceived lag
 - [x] Week 3 — Canvas vs DOM Order Book UI + benchmark
 - [x] Week 4 — Depth of Market visualizer
-- [ ] Live feed integration (pending Member 3's backend)
+- [x] Live feed integration (Connected to real Spring Boot backend)
