@@ -23,12 +23,17 @@ OrderFlow is a super-fast financial trading system built for Capital Markets. It
 
 1. **Clone the repository:**
    `git clone [insert your repository link here]`
-2. **Setup the Backend:**
+2. **Install Node.js:**
+   * Install the current Node.js LTS release (Node.js 18 or newer), then restart your terminal.
+   * Verify that both commands work:
+     `node --version`
+     `npm --version`
+3. **Setup the Backend:**
    * Open the Java project in your favorite IDE (like IntelliJ or Eclipse).
    * Install Maven dependencies.
    * Run the main Spring Boot application.
-3. **Setup the Frontend:**
-   * Navigate to the frontend folder.
+4. **Setup the Frontend:**
+   * Navigate to the repository root.
    * Run `npm install` to download packages.
    * Run `npm start` to launch the React app.
 
