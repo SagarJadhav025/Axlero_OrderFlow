@@ -11,6 +11,8 @@ export default function OrderEntryForm({ onSubmitOrder }) {
   const [form, setForm] = useState(initialState)
   const [error, setError] = useState('')
   const [lastSubmitted, setLastSubmitted] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState('')
 
   const isMarket = form.orderType === 'MARKET'
 
@@ -32,11 +34,13 @@ export default function OrderEntryForm({ onSubmitOrder }) {
     return ''
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
+    if (submitting) return
     const validationError = validate()
     if (validationError) {
       setError(validationError)
+      setSuccess('')
       return
     }
 
@@ -49,16 +53,18 @@ export default function OrderEntryForm({ onSubmitOrder }) {
     }
 
     setError('')
-    setLastSubmitted(order)
-
-    // Week 2 will wire this into the WebSocket/API call to the backend.
-    if (onSubmitOrder) {
-      onSubmitOrder(order)
-    } else {
-      console.log('Order submitted:', order)
+    setSuccess('')
+    setSubmitting(true)
+    try {
+      await onSubmitOrder(order)
+      setLastSubmitted(order)
+      setSuccess('Order accepted by backend. Executed trades will appear here when matched.')
+      setForm((prev) => ({ ...initialState, side: prev.side, orderType: prev.orderType }))
+    } catch (submissionError) {
+      setError(submissionError.message || 'Order could not be submitted.')
+    } finally {
+      setSubmitting(false)
     }
-
-    setForm((prev) => ({ ...initialState, side: prev.side, orderType: prev.orderType }))
   }
 
   return (
@@ -123,9 +129,10 @@ export default function OrderEntryForm({ onSubmitOrder }) {
         </div>
 
         {error && <p className="form-error">{error}</p>}
+        {success && <p className="form-success">{success}</p>}
 
-        <button type="submit" className={`submit-btn ${form.side.toLowerCase()}`}>
-          {form.side === 'BUY' ? 'Place Buy Order' : 'Place Sell Order'}
+        <button type="submit" className={`submit-btn ${form.side.toLowerCase()}`} disabled={submitting}>
+          {submitting ? 'Submitting…' : form.side === 'BUY' ? 'Place Buy Order' : 'Place Sell Order'}
         </button>
       </form>
 

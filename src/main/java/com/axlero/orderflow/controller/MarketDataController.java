@@ -2,11 +2,14 @@ package com.axlero.orderflow.controller;
 
 import com.axlero.orderflow.engine.OrderEventHandler;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 import java.util.Map;
 
 @RestController
+@CrossOrigin(origins = "http://localhost:5173")
 public class MarketDataController {
 
     @Autowired
@@ -19,5 +22,10 @@ public class MarketDataController {
                 "bids", orderEventHandler.getTopBids(),
                 "asks", orderEventHandler.getTopAsks()
         );
+    }
+
+    @GetMapping("/api/trades")
+    public List<Map<String, Object>> getRecentTrades() {
+        return orderEventHandler.getRecentTrades();
     }
 }

@@ -1,11 +1,10 @@
 const STATUS_LABEL = {
   connecting: 'Connecting…',
   live: 'Live',
-  simulated: 'Simulated (backend not connected)',
-  error: 'Connection error — showing simulated data'
+  disconnected: 'Disconnected'
 }
 
-export default function RecentTrades({ trades, status }) {
+export default function RecentTrades({ trades, status, error }) {
   return (
     <div className="recent-trades">
       <div className="recent-trades-header">
@@ -15,8 +14,11 @@ export default function RecentTrades({ trades, status }) {
         </span>
       </div>
 
+      {error && <p className="form-error">{error}</p>}
       {trades.length === 0 ? (
-        <p className="placeholder-text">Waiting for trades…</p>
+        <p className="placeholder-text">
+          {status === 'live' ? 'Connected — waiting for an executed trade…' : 'Connecting to backend trade stream…'}
+        </p>
       ) : (
         <table className="trades-table">
           <thead>

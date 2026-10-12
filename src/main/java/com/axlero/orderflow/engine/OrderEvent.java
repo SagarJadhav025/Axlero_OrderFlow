@@ -1,11 +1,14 @@
+
 package com.axlero.orderflow.engine;
 
 import com.axlero.orderflow.enums.OrderSide;
 
+import java.util.Locale;
+
 public class OrderEvent {
 
     private String orderId;
-    private String side;
+    private OrderSide side;
     private String orderType;
     private double price;
     private int quantity;
@@ -18,16 +21,26 @@ public class OrderEvent {
         this.orderId = orderId;
     }
 
-    public String getSide() {
+    public OrderSide getSide() {
         return side;
     }
 
-    public void setSide(String side) {
+    public void setSide(OrderSide side) {
         this.side = side;
     }
 
-    public void setSide(OrderSide side) {
-        this.side = side != null ? side.name() : null;
+    public void setSide(String side) {
+        this.side = side == null
+                ? null
+                : OrderSide.valueOf(side.trim().toUpperCase(Locale.ROOT));
+    }
+
+    public String getOrderType() {
+        return orderType;
+    }
+
+    public void setOrderType(String orderType) {
+        this.orderType = orderType;
     }
 
     public double getPrice() {
@@ -46,14 +59,7 @@ public class OrderEvent {
         this.quantity = quantity;
     }
 
-    public String getOrderType() {
-        return orderType;
-    }
-
-    public void setOrderType(String orderType) {
-        this.orderType = orderType;
-    }
-
+    // Original Week 1 API
     public void set(
             String orderId,
             String side,
@@ -62,12 +68,13 @@ public class OrderEvent {
             int quantity) {
 
         this.orderId = orderId;
-        this.side = side;
+        setSide(side);
         this.orderType = orderType;
         this.price = price;
         this.quantity = quantity;
     }
 
+    // Current OrderSide API
     public void set(
             String orderId,
             OrderSide side,
@@ -75,7 +82,8 @@ public class OrderEvent {
             int quantity) {
 
         this.orderId = orderId;
-        this.side = side != null ? side.name() : null;
+        this.side = side;
+        this.orderType = "LIMIT";
         this.price = price;
         this.quantity = quantity;
     }
