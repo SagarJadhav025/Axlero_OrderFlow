@@ -1,5 +1,4 @@
 
-import React from 'react';
 import { useMarketData } from './useMarketData.js';
 import OrderEntry from './OrderEntry.jsx';
 import TradesList from './TradesList.jsx';
