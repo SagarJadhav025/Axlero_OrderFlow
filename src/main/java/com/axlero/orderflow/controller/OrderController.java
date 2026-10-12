@@ -43,4 +43,10 @@ public class OrderController {
         );
         return ResponseEntity.accepted().body("Order successfully sent to Axlero Engine!");
     }
+    
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleRejectedOrder(
+            IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(exception.getMessage());
+    }
 }
