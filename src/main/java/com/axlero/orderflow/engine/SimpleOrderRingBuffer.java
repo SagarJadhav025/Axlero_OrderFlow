@@ -1,5 +1,7 @@
 package com.axlero.orderflow.engine;
 
+import com.axlero.orderflow.enums.OrderSide;
+
 /**
  * A fixed-size circular collection of reusable order event slots. Each write
  * advances to the next slot; once the last slot is reached, writing wraps to
@@ -28,9 +30,9 @@ public final class SimpleOrderRingBuffer {
     }
 
     /** Writes values into the next reusable slot and returns that same slot. */
-    public OrderEvent write(String orderId, String side, String orderType, double price, int quantity) {
+    public OrderEvent write(String orderId, OrderSide side, double price, int quantity) {
         OrderEvent slot = slots[nextWriteIndex];
-        slot.set(orderId, side, orderType, price, quantity);
+        slot.set(orderId, side, price, quantity);
         nextWriteIndex = (nextWriteIndex + 1) % slots.length;
         if (size < slots.length) {
             size++;

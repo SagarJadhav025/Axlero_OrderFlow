@@ -4,7 +4,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.util.Map;
 
-import com.axlero.orderflow.OrderSide;
+import com.axlero.orderflow.enums.OrderSide;
 // import com.axlero.orderflow.service.KafkaOrderProducer; // Muted to stop crashes
 import com.lmax.disruptor.EventHandler;
 import org.springframework.stereotype.Component;

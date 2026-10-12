@@ -1,6 +1,6 @@
 package com.axlero.orderflow.engine;
 
-import com.axlero.orderflow.OrderSide;
+import com.axlero.orderflow.enums.OrderSide;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import org.springframework.stereotype.Component;

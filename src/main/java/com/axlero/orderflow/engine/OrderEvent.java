@@ -1,5 +1,7 @@
 package com.axlero.orderflow.engine;
 
+import com.axlero.orderflow.enums.OrderSide;
+
 public class OrderEvent {
 
     private String orderId;
@@ -22,6 +24,10 @@ public class OrderEvent {
 
     public void setSide(String side) {
         this.side = side;
+    }
+
+    public void setSide(OrderSide side) {
+        this.side = side != null ? side.name() : null;
     }
 
     public double getPrice() {
@@ -58,6 +64,18 @@ public class OrderEvent {
         this.orderId = orderId;
         this.side = side;
         this.orderType = orderType;
+        this.price = price;
+        this.quantity = quantity;
+    }
+
+    public void set(
+            String orderId,
+            OrderSide side,
+            double price,
+            int quantity) {
+
+        this.orderId = orderId;
+        this.side = side != null ? side.name() : null;
         this.price = price;
         this.quantity = quantity;
     }
