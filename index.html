@@ -231,45 +231,38 @@
   <script src="stramcheck.js"></script>
   <script src="OrderBookCanvas.jsx"></script>
   <script src="Depthmarket.js"></script>
-  <script>
-   createMarketSocket('ws://localhost:8081',
-      (msg) => {
-        if (msg.type === 'trade') recordTrade(msg);
-        if (msg.type === 'orderbook') {
-          updateOrderBook(msg);
-          updateDOM(msg);
-        }
-      },
-      (s) => {
-        const el = document.getElementById('status');
-        el.textContent = 'Status: ' + s;
-        el.className = s;
-      }
-    );
+ <script>
+  function handle(msg) {
+    if (msg.type === 'trade') recordTrade(msg);
+    if (msg.type === 'orderbook') { updateOrderBook(msg); updateDOM(msg); }
+  }
+  function setStatus(label, cls) {
+    const el = document.getElementById('status');
+    el.textContent = 'Status: ' + label;
+    el.className = cls;
+  }
 
-    // --- Dummy data generator for testing ---
+  if (location.search.includes('demo')) {
+    // demo mode: same messages the mock server sends, generated in the browser
+    setStatus('connected (demo data)', 'connected');
+    let price = 100;
     setInterval(() => {
-      // Fake trade
-      const trade = {
-        type: "trade",
-        price: (140 + Math.random() * 20).toFixed(2),
-        side: Math.random() > 0.5 ? "buy" : "sell",
-        volume: Math.floor(Math.random() * 100)
-      };
-      recordTrade(trade);
-
-      // Fake orderbook snapshot
-      const orderbook = {
-        type: "orderbook",
-        bid: (140 + Math.random() * 10).toFixed(2),
-        ask: (150 + Math.random() * 10).toFixed(2),
-        bids: [{ price: 145, volume: 50 }, { price: 144, volume: 30 }],
-        asks: [{ price: 146, volume: 40 }, { price: 147, volume: 25 }]
-      };
-      updateOrderBook(orderbook);
-      updateDOM(orderbook);
-    }, 2000);
-  </script>
+      price += (Math.random() - 0.5) * 0.2;
+      handle({ type: 'trade', symbol: 'AAPL', price: +price.toFixed(2),
+               quantity: Math.floor(Math.random() * 100) + 1,
+               side: Math.random() > 0.5 ? 'BUY' : 'SELL', timestamp: Date.now() });
+    }, 10);
+    setInterval(() => {
+      const mid = 100 + Math.random() * 2;
+      const lv = (sign, i) => ({ price: +(mid + sign * (i + (sign > 0 ? 1 : 0)) * 0.05).toFixed(2),
+                                 qty: Math.floor(Math.random() * 500) + 50 });
+      handle({ type: 'orderbook',
+               bids: Array.from({ length: 10 }, (_, i) => lv(-1, i)),
+               asks: Array.from({ length: 10 }, (_, i) => lv(1, i)) });
+    }, 100);
+  } else {
+    createMarketSocket('ws://localhost:8081', handle, (s) => setStatus(s, s));
+  }
+</script>
 </body>
 </html>
-

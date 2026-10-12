@@ -1,68 +1,89 @@
-import React, { useEffect, useRef } from 'react';
-import { fmtPrice } from './format.js';
 
-const ROW = 20;
-const LEVELS = 15;
 
-export default function OrderBookCanvas({ depth }) {
-  const canvasRef = useRef(null);
-  const perfRef = useRef(null);
-  const avg = useRef(0);
+const obCanvas = document.getElementById('orderBookCanvas');
+const obCtx = obCanvas.getContext('2d');
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !depth) return;
-    const t0 = performance.now();
+const OB_ROW_H = 22;
+const OB_MAX_ROWS = 10;
+const OB_TOP = 28;        // first row starts below the header
+const OB_BAR_MAX = 165;   // longest bar in pixels
 
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth;
-    const h = (LEVELS * 2 + 2) * ROW;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.height = `${h}px`;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, w, h);
-    ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
-    ctx.textBaseline = 'middle';
+let lastSnapshot = null;
+let obDirty = false;      
+let obDrawMs = 0;         
 
-    const bids = depth.bids;
-    const asks = depth.asks;
-    const max = Math.max(1, ...bids.map((l) => l[1]), ...asks.map((l) => l[1]));
-
-    const drawRow = (level, y, color, bar) => {
-      ctx.fillStyle = bar;
-      ctx.fillRect(w - (level[1] / max) * w, y, (level[1] / max) * w, ROW - 2);
-      ctx.fillStyle = color;
-      ctx.textAlign = 'left';
-      ctx.fillText(fmtPrice(level[0]), 8, y + ROW / 2);
-      ctx.fillStyle = '#d6dbe0';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(level[1]), w - 8, y + ROW / 2);
-    };
-
-    // asks: best ask sits just above the spread line, worse prices further up
-    for (let i = 0; i < Math.min(LEVELS, asks.length); i++) {
-      drawRow(asks[i], (LEVELS - 1 - i) * ROW, '#ef5350', 'rgba(239,83,80,0.25)');
-    }
-    const spreadY = LEVELS * ROW;
-    ctx.fillStyle = '#8b949e';
-    ctx.textAlign = 'center';
-    if (bids.length && asks.length) ctx.fillText(`Spread ${fmtPrice(asks[0][0] - bids[0][0])}`, w / 2, spreadY + ROW / 2);
-    for (let i = 0; i < Math.min(LEVELS, bids.length); i++) {
-      drawRow(bids[i], spreadY + ROW + i * ROW, '#26a69a', 'rgba(38,166,154,0.25)');
-    }
-
-    const ms = performance.now() - t0;
-    avg.current = avg.current ? avg.current * 0.9 + ms * 0.1 : ms;
-    if (perfRef.current) perfRef.current.textContent = `Canvas draw: ${ms.toFixed(2)} ms (avg ${avg.current.toFixed(2)} ms)`;
-  }, [depth]);
-
-  return (
-    <section className="panel">
-      <h2>Order Book <small>(HTML5 Canvas)</small></h2>
-      <canvas ref={canvasRef} className="book-canvas" />
-      <div className="perf" ref={perfRef} />
-    </section>
-  );
+function updateOrderBook(snapshot) {
+  lastSnapshot = snapshot;
+  obDirty = true;
 }
+
+function setObText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function drawOrderBook() {
+  requestAnimationFrame(drawOrderBook);
+  if (!lastSnapshot || !obDirty || isPaused) return;
+  obDirty = false;
+
+  const t0 = performance.now();
+
+  const bids = lastSnapshot.bids.slice(0, OB_MAX_ROWS);
+  const asks = lastSnapshot.asks.slice(0, OB_MAX_ROWS);
+  const maxQty = Math.max(...bids.map(l => l.qty), ...asks.map(l => l.qty), 1);
+  const mid = obCanvas.width / 2;
+
+  obCtx.clearRect(0, 0, obCanvas.width, obCanvas.height);
+
+  // headers
+  obCtx.font = '11px monospace';
+  obCtx.fillStyle = '#7b8aa3';
+  obCtx.fillText('BID PRICE', 10, 16);
+  obCtx.fillText('QTY', 100, 16);
+  obCtx.fillText('ASK PRICE', 490, 16);
+  obCtx.fillText('QTY', 548, 16);
+
+  // centre divider
+  obCtx.strokeStyle = '#222d3f';
+  obCtx.beginPath();
+  obCtx.moveTo(mid, 22);
+  obCtx.lineTo(mid, obCanvas.height - 6);
+  obCtx.stroke();
+
+  obCtx.font = '13px monospace';
+
+  // bids: bars grow left from the centre
+  bids.forEach((lv, i) => {
+    const y = OB_TOP + i * OB_ROW_H;
+    const w = (lv.qty / maxQty) * OB_BAR_MAX;
+    obCtx.fillStyle = i === 0 ? 'rgba(22,163,74,0.85)' : 'rgba(22,163,74,0.45)';
+    obCtx.fillRect(mid - w, y + 2, w, 18);
+    obCtx.fillStyle = i === 0 ? '#ffffff' : '#d6deeb';
+    obCtx.fillText(lv.price.toFixed(2), 10, y + 16);
+    obCtx.fillText(String(lv.qty), 100, y + 16);
+  });
+
+  // asks: bars grow right from the centre
+  asks.forEach((lv, i) => {
+    const y = OB_TOP + i * OB_ROW_H;
+    const w = (lv.qty / maxQty) * OB_BAR_MAX;
+    obCtx.fillStyle = i === 0 ? 'rgba(220,38,38,0.85)' : 'rgba(220,38,38,0.45)';
+    obCtx.fillRect(mid, y + 2, w, 18);
+    obCtx.fillStyle = i === 0 ? '#ffffff' : '#d6deeb';
+    obCtx.fillText(lv.price.toFixed(2), 490, y + 16);
+    obCtx.fillText(String(lv.qty), 548, y + 16);
+  });
+
+  // best bid / best ask / spread cards at the top of the page
+  if (bids.length) setObText('bestBid', bids[0].price.toFixed(2));
+  if (asks.length) setObText('bestAsk', asks[0].price.toFixed(2));
+  if (bids.length && asks.length) {
+    setObText('spread', (asks[0].price - bids[0].price).toFixed(2));
+  }
+
+  // smoothed draw time, so the number on screen doesn't jitter
+  obDrawMs = obDrawMs * 0.9 + (performance.now() - t0) * 0.1;
+}
+
+requestAnimationFrame(drawOrderBook);
