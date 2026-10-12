@@ -51,4 +51,29 @@ public final class SimpleOrderRingBuffer {
 
     public int capacity() { return slots.length; }
     public int size() { return size; }
+    
+    
+/**
+ * Backward-compatible write method for the original Week 1 API.
+ */
+public OrderEvent write(
+        String orderId,
+        String side,
+        String orderType,
+        double price,
+        int quantity) {
+
+    OrderEvent slot = slots[nextWriteIndex];
+    slot.set(orderId, side, orderType, price, quantity);
+
+    nextWriteIndex = (nextWriteIndex + 1) % slots.length;
+
+    if (size < slots.length) {
+        size++;
+    }
+
+    return slot;
+}
+
+
 }
