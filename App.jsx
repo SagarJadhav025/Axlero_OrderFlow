@@ -5,7 +5,8 @@ import TradesList from './TradesList.jsx';
 import OrderBookDom from './OrderBookDom.jsx';
 import OrderBookCanvas from './OrderBookCanvas.jsx';
 
-export default function App() {
+export default function App()
+ {
   const { trades, depth, connected } = useMarketData();
   return (
     <div className="terminal">
