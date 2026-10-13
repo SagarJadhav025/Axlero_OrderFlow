@@ -261,7 +261,7 @@
                asks: Array.from({ length: 10 }, (_, i) => lv(1, i)) });
     }, 100);
   } else {
-    createMarketSocket('ws://localhost:8081', handle, (s) => setStatus(s, s));
+    createMarketSocket('ws://localhost:3000', handle, (s) => setStatus(s, s));
   }
 </script>
 </body>
