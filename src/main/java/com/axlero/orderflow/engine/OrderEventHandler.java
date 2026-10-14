@@ -5,7 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.Map;
 
 import com.axlero.orderflow.enums.OrderSide;
-// import com.axlero.orderflow.service.KafkaOrderProducer; // Muted to stop crashes
+import com.axlero.orderflow.service.KafkaOrderProducer;
 import com.lmax.disruptor.EventHandler;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +14,6 @@ import java.util.Comparator;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.time.Instant;
 import java.util.UUID;
@@ -23,12 +22,14 @@ import java.util.stream.Collectors;
 @Component
 public class OrderEventHandler implements EventHandler<OrderEvent> {
 
-    // private final KafkaOrderProducer producer; // Muted to stop crashes
+    private final KafkaOrderProducer producer;
 
-    // BUY → highest price first
+    private long lastBroadcastTime = 0; // Throttle timer for 1M load tests
+
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
+    // BUY → highest price first
     private final PriorityQueue<OrderRecord> buyOrders =
             new PriorityQueue<>(
                     Comparator.comparingDouble(OrderRecord::getPrice).reversed()
@@ -39,11 +40,12 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
             new PriorityQueue<>(
                     Comparator.comparingDouble(OrderRecord::getPrice)
             );
+
     private final Deque<Map<String, Object>> recentTrades = new ArrayDeque<>();
 
-    // public OrderEventHandler(KafkaOrderProducer producer) {
-    //     this.producer = producer;
-    // } // Muted so Spring Boot boots cleanly
+    public OrderEventHandler(KafkaOrderProducer producer) {
+        this.producer = producer;
+    }
 
     @Override
     public synchronized void onEvent(
@@ -53,11 +55,11 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
 
         // Copy Disruptor event into OrderRecord
         OrderRecord order = new OrderRecord(
-        event.getOrderId(),
-        event.getSide(),
-        event.getPrice(),
-        event.getQuantity()
-);
+                event.getOrderId(),
+                event.getSide(),
+                event.getPrice(),
+                event.getQuantity()
+        );
 
         System.out.println(
                 "Received " +
@@ -84,12 +86,20 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
             matchOrders(order.getSide());
         }
 
-        Object payload = Map.of(
-                "bids", getTopBids(),
-                "asks", getTopAsks()
-        );
+        // Throttle WebSocket updates to 4 times a second to handle 1M orders without crashing Vite
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastBroadcastTime > 250) {
+            String orderBookDestination = "/topic/orderbook";
+            messagingTemplate.convertAndSend(orderBookDestination, (Object) Map.of(
+                    "bids", getTopBids(),
+                    "asks", getTopAsks()
+            ));
 
-        messagingTemplate.convertAndSend("/topic/orderbook", payload);
+            String tradeDestination = "/topic/trades";
+            messagingTemplate.convertAndSend(tradeDestination, (Object) getRecentTrades());
+
+            lastBroadcastTime = currentTime;
+        }
     }
 
     private void matchOrders(OrderSide aggressorSide) {
@@ -115,13 +125,13 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
 
             publishTrade(aggressorSide, tradePrice, tradedQuantity, buy, sell);
 
-             //Publish successful trade to Kafka
-             //producer.publishTrade(
-             //        buy.getOrderId(),
-             //        sell.getOrderId(),
-             //        tradedQuantity,
-             //        tradePrice
-            // ); // Muted so it does not crash when producer is missing
+            // Publish successful trade to Kafka
+            producer.publishTrade(
+                    buy.getOrderId(),
+                    sell.getOrderId(),
+                    tradedQuantity,
+                    tradePrice
+            );
 
             // Reduce remaining quantity
             buy.setQuantity(
@@ -186,8 +196,9 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
         while (recentTrades.size() > 25) {
             recentTrades.removeLast();
         }
-        Object tradePayload = trade;
-        messagingTemplate.convertAndSend("/topic/trades", tradePayload);
+
+        // Note: Instant broadcast removed to prevent Vite crashes during 1M order load test.
+        // Trades are now safely broadcasted in the throttled block inside onEvent().
     }
 
     public synchronized List<Map<String, Object>> getRecentTrades() {
@@ -195,28 +206,28 @@ public class OrderEventHandler implements EventHandler<OrderEvent> {
     }
 
     public synchronized List<OrderRecord> getTopBids() {
-        List<OrderRecord> bids = buyOrders.stream()
+        return buyOrders.stream()
                 .map(order -> new OrderRecord(
                         order.getOrderId(),
                         order.getSide(),
                         order.getPrice(),
                         order.getQuantity()
                 ))
+                .sorted(Comparator.comparingDouble(OrderRecord::getPrice).reversed())
+                .limit(20)
                 .collect(Collectors.toCollection(ArrayList::new));
-        bids.sort(Comparator.comparingDouble(OrderRecord::getPrice).reversed());
-        return bids;
     }
 
     public synchronized List<OrderRecord> getTopAsks() {
-        List<OrderRecord> asks = sellOrders.stream()
+        return sellOrders.stream()
                 .map(order -> new OrderRecord(
                         order.getOrderId(),
                         order.getSide(),
                         order.getPrice(),
                         order.getQuantity()
                 ))
+                .sorted(Comparator.comparingDouble(OrderRecord::getPrice))
+                .limit(20)
                 .collect(Collectors.toCollection(ArrayList::new));
-        asks.sort(Comparator.comparingDouble(OrderRecord::getPrice));
-        return asks;
     }
 }
